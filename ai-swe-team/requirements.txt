@@ -1,0 +1,25 @@
+langgraph
+langchain
+langchain-groq
+langchain-openai
+langchain-google-genai
+langchain-mcp-adapters
+langgraph-checkpoint-postgres
+fastapi
+uvicorn[standard]
+psycopg[binary]>=3.1
+psycopg-pool>=3.1
+psycopg2-binary>=2.9     # sync engine for SQLAlchemy (init_db + FastAPI routes)
+docker
+gitpython
+pydantic
+pydantic-settings
+python-dotenv
+chromadb
+playwright
+sqlalchemy
+alembic
+mcp-server-git
+httpx
+pytest
+pytest-asyncio

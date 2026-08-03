@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+# Install common testing and web framework dependencies for generated code.
+# Add more packages here as your generated projects require them.
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    fastapi \
+    httpx \
+    sqlalchemy \
+    pydantic \
+    requests
+
+# Non-root user: generated code should never run as root inside the container.
+RUN useradd -m -u 1000 sandboxuser
+USER sandboxuser
+
+WORKDIR /workspace
+
+# No ENTRYPOINT or CMD - the sandbox runner injects the exact command per execution.
