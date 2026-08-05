@@ -2,7 +2,7 @@ from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
-from app.agents.llm_factory import get_reasoning_llm
+from app.agents.llm_factory import get_reasoning_llm, structured_llm
 from app.graph.state import ProjectState
 
 
@@ -46,7 +46,7 @@ def architect_node(state: ProjectState) -> dict:
     API contracts, and DB schema. Backend and Frontend developers run in parallel
     off this node's output.
     """
-    llm = get_reasoning_llm().with_structured_output(ArchitecturePlan)
+    llm = structured_llm(get_reasoning_llm(), ArchitecturePlan)
     result: ArchitecturePlan = llm.invoke(
         [
             ("system", ARCHITECT_SYSTEM_PROMPT),

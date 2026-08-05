@@ -12,7 +12,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from app.tools.docs_retrieval import _collection, _embed_fn
+from app.tools.docs_retrieval import _get_collection
 
 server = Server("docs")
 
@@ -51,7 +51,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         raise ValueError(f"Unknown tool: {name}")
     query = arguments["query"]
     n_results = arguments.get("n_results", 5)
-    results = _collection.query(query_texts=[query], n_results=n_results)
+    collection = _get_collection()
+    if collection is None:
+        return [TextContent(type="text", text="(RAG disabled — no embedding API key configured)")]
+    results = collection.query(query_texts=[query], n_results=n_results)
     docs = results["documents"][0] if results["documents"] else []
     return [TextContent(type="text", text="\n---\n".join(docs))]
 

@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from app.agents.llm_factory import get_coding_llm
+from app.agents.llm_factory import get_coding_llm, structured_llm
 from app.graph.state import FileArtifact, ProjectState
 
 
@@ -39,7 +39,7 @@ def frontend_dev_node(state: ProjectState) -> dict:
     Runs in parallel with backend_dev_node. On revision passes, incorporates
     blocking review comments.
     """
-    llm = get_coding_llm().with_structured_output(FrontendOutput)
+    llm = structured_llm(get_coding_llm(), FrontendOutput)
     feedback_parts: list[str] = []
     if state.get("review_comments"):
         blocking = [

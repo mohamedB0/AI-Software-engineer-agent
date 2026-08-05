@@ -16,6 +16,7 @@ pydantic
 pydantic-settings
 python-dotenv
 chromadb
+google-generativeai
 playwright
 sqlalchemy
 alembic

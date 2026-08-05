@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from app.agents.llm_factory import get_reasoning_llm
+from app.agents.llm_factory import get_reasoning_llm, structured_llm
 from app.graph.state import ProjectState
 
 
@@ -34,7 +34,7 @@ def product_manager_node(state: ProjectState) -> dict:
     Converts the raw project specification into structured requirements and
     user stories. This is the graph's entry point.
     """
-    llm = get_reasoning_llm().with_structured_output(Requirements)
+    llm = structured_llm(get_reasoning_llm(), Requirements)
     result: Requirements = llm.invoke(
         [
             ("system", PM_SYSTEM_PROMPT),

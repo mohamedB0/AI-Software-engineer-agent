@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from app.agents.llm_factory import get_reasoning_llm
+from app.agents.llm_factory import get_reasoning_llm, structured_llm
 from app.graph.state import ProjectState, ReviewComment
 
 
@@ -43,7 +43,7 @@ def code_reviewer_node(state: ProjectState) -> dict:
     Code Reviewer agent: performs a static review of all backend and frontend files
     against the architecture plan and test results. Approves or requests changes.
     """
-    llm = get_reasoning_llm().with_structured_output(ReviewOutput)
+    llm = structured_llm(get_reasoning_llm(), ReviewOutput)
     all_files = {**state["backend_files"], **state["frontend_files"]}
 
     result: ReviewOutput = llm.invoke(

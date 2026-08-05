@@ -46,7 +46,7 @@ from app.config import settings
 # Groq model names
 # ---------------------------------------------------------------------------
 GROQ_REASONING_MODEL = "llama-3.3-70b-versatile"
-GROQ_CODING_MODEL = "llama-3.1-70b-versatile"
+GROQ_CODING_MODEL = "llama-3.3-70b-versatile"
 GROQ_FAST_MODEL = "llama-3.1-8b-instant"
 
 # ---------------------------------------------------------------------------
@@ -69,7 +69,12 @@ def _get_provider() -> str:
 
 def _groq(model: str):
     from langchain_groq import ChatGroq
-    return ChatGroq(model=model, api_key=settings.groq_api_key, temperature=0)
+    return ChatGroq(
+        model=model,
+        api_key=settings.groq_api_key,
+        temperature=0,
+        max_retries=6,   # retries on 429 with exponential backoff (~2 min total)
+    )
 
 
 def _google(model: str):
@@ -124,3 +129,37 @@ def get_fast_llm():
     Fast, lightweight model for repetitive tasks like test generation.
     """
     return _build(GROQ_FAST_MODEL, GOOGLE_MODEL, QWEN_FAST_MODEL)
+
+
+def structured_llm(llm, schema):
+    """
+    Wrap an LLM with structured output, using the right method per provider.
+
+    Groq's Llama models often fail with the default tool-calling approach on
+    complex Pydantic schemas (they emit ``<function=...>`` XML instead of valid
+    tool calls). Using ``method="json_mode"`` avoids this, but Groq also
+    requires the word "json" to appear somewhere in the messages. We inject a
+    system message containing the full JSON schema to satisfy both constraints.
+    """
+    provider = _get_provider()
+    if provider == "groq":
+        import json as _json
+        from langchain_core.messages import SystemMessage
+        from langchain_core.runnables import RunnableLambda
+
+        schema_str = _json.dumps(schema.model_json_schema(), indent=2)
+        json_instruction = SystemMessage(content=(
+            "You must respond with valid JSON (and nothing else) matching this schema:\n"
+            f"```json\n{schema_str}\n```"
+        ))
+
+        def _prepend_schema(messages):
+            """Prepend the JSON schema instruction to satisfy Groq's requirement."""
+            return [json_instruction] + list(messages)
+
+        return (
+            RunnableLambda(_prepend_schema)
+            | llm.with_structured_output(schema, method="json_mode")
+        )
+    return llm.with_structured_output(schema)
+

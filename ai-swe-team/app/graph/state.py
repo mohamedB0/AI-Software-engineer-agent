@@ -72,7 +72,7 @@ class ProjectState(TypedDict):
     # "planning" | "requirements_done" | "architecture_done" | "backend_done" |
     # "frontend_done" | "qa_passed" | "qa_failed" | "approved" |
     # "changes_requested" | "done" | "failed"
-    status: str
+    status: Annotated[str, lambda old, new: new]
 
     # --- Observability: append-only message log across all agents ---
     messages: Annotated[list, operator.add]

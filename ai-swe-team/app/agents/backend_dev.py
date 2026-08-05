@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from app.agents.llm_factory import get_coding_llm
+from app.agents.llm_factory import get_coding_llm, structured_llm
 from app.graph.state import FileArtifact, ProjectState
 from app.tools.docs_retrieval import search_docs
 
@@ -44,7 +44,7 @@ def backend_dev_node(state: ProjectState) -> dict:
     On revision passes, incorporates QA failures and blocking review comments.
     Retrieves relevant library docs via RAG to reduce API hallucination.
     """
-    llm = get_coding_llm().with_structured_output(BackendOutput)
+    llm = structured_llm(get_coding_llm(), BackendOutput)
     # Pull relevant docs for the chosen stack to reduce API hallucination.
     doc_snippets: list[str] = []
     for tech in state["architecture"].get("stack", []):
