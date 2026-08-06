@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +13,7 @@ class CodeFile(BaseModel):
 
 
 class BackendOutput(BaseModel):
-    files: List[CodeFile]
+    files: list[CodeFile]
     notes: str = Field(
         description="Anything the QA engineer or code reviewer should know about this implementation"
     )
@@ -84,6 +83,5 @@ def backend_dev_node(state: ProjectState) -> dict:
     }
     return {
         "backend_files": files,
-        "status": "backend_done",
         "messages": [f"[Backend Dev] Wrote {len(files)} files. {result.notes}"],
     }

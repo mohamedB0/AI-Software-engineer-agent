@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.db.session import engine
 from app.db.models import Base
+from app.db.session import engine
 
 Base.metadata.create_all(engine)
 print("Application tables created successfully.")

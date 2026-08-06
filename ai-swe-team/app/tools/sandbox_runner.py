@@ -11,10 +11,17 @@ Security properties:
   runaway or malicious scripts from affecting the host.
 - Non-root user (sandboxuser) baked into Dockerfile.sandbox.
 - Container always removed in the finally block (no orphaned containers).
+- File paths are sanitised before being written, so agent-supplied paths
+  cannot escape the working directory (no '..', absolute, or empty paths).
+- exec_run enforces a hard timeout so a hanging test cannot block a worker.
 - No secrets are passed to the sandbox via environment variables.
+
+The Docker client is initialised lazily so importing this module never
+requires a running daemon (important for unit tests and app startup).
 """
 
 import io
+import logging
 import re
 import tarfile
 
@@ -22,16 +29,53 @@ import docker
 
 from app.config import settings
 
-_client = docker.from_env()
+logger = logging.getLogger(__name__)
+
+_client = None
+
+
+def _get_client():
+    """Return a lazily-initialised Docker client (no daemon I/O at import time)."""
+    global _client
+    if _client is None:
+        _client = docker.from_env()
+    return _client
+
+
+def _safe_relative_path(path: str) -> str | None:
+    """
+    Coerce an agent-supplied path into a safe relative path.
+
+    Returns None when the path is unsafe (absolute, contains a '..' segment,
+    is empty, or has empty segments) so callers can skip it instead of
+    extracting a file outside the sandbox working directory.
+    """
+    if path.startswith("/") or path.startswith("\\"):
+        return None
+    normalized = path.replace("\\", "/").strip("/")
+    parts = normalized.split("/")
+    if not parts:
+        return None
+    if any(part in ("", ".", "..") for part in parts):
+        return None
+    return normalized
 
 
 def _build_tar(files: dict[str, str]) -> io.BytesIO:
-    """Pack a dict of {path: content} into an in-memory tar archive."""
+    """Pack a dict of {path: content} into an in-memory tar archive.
+
+    Unsafe paths are skipped with a warning so a single bad path cannot fail
+    the whole sandbox run.
+    """
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w") as tar:
         for path, content in files.items():
+            safe_path = _safe_relative_path(path)
+            if safe_path is None:
+                logger.warning("Skipping unsafe sandbox file path: %r", path)
+                continue
             data = content.encode("utf-8")
-            info = tarfile.TarInfo(name=path)
+            info = tarfile.TarInfo(name=safe_path)
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
     buf.seek(0)
@@ -55,7 +99,7 @@ def run_in_sandbox(
     Returns:
         dict with keys: passed, total, failed, failures, logs.
     """
-    container = _client.containers.create(
+    container = _get_client().containers.create(
         image=settings.sandbox_image,
         # Keep the container alive; the actual command is injected via exec_run.
         command=["sleep", str(timeout + 5)],
@@ -69,15 +113,30 @@ def run_in_sandbox(
     try:
         container.start()
         container.put_archive("/workspace", _build_tar(code_files))
-        exit_code, output = container.exec_run(
-            cmd=["bash", "-lc", test_command],
-            workdir="/workspace",
-            demux=False,
-        )
-        logs = output.decode("utf-8", errors="replace") if output else ""
-        return _parse_pytest_output(exit_code, logs)
+        try:
+            exit_code, output = container.exec_run(
+                cmd=["bash", "-lc", test_command],
+                workdir="/workspace",
+                demux=False,
+                timeout=timeout,
+            )
+            logs = output.decode("utf-8", errors="replace") if output else ""
+            return _parse_pytest_output(exit_code, logs)
+        except Exception as e:
+            # e.g. ReadTimeout when the command exceeds `timeout`.
+            logger.warning("Sandbox command failed or timed out: %s", e)
+            return {
+                "passed": False,
+                "total": 0,
+                "failed": 0,
+                "failures": [],
+                "logs": f"Sandbox execution failed or timed out after {timeout}s: {e}"[:4000],
+            }
     finally:
-        container.kill()
+        try:
+            container.kill()
+        except Exception:
+            pass
         container.remove(force=True)
 
 

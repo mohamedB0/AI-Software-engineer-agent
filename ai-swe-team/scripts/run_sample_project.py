@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from app.config import settings
 from app.graph.build_graph import build_graph
 
 graph = build_graph()
@@ -37,7 +38,7 @@ config = {"configurable": {"thread_id": str(uuid.uuid4())}}
 initial_state = {
     "spec": SAMPLE_SPEC,
     "revision_count": 0,
-    "max_revisions": 3,
+    "max_revisions": settings.max_revisions,
     "status": "planning",
     "review_comments": [],
     "messages": [],

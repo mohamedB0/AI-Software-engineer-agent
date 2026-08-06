@@ -1,10 +1,14 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class Project(Base):
@@ -19,5 +23,5 @@ class Project(Base):
     status = Column(String, default="pending")
     repo_url = Column(String, nullable=True)
     revision_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)

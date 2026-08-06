@@ -144,6 +144,7 @@ def structured_llm(llm, schema):
     provider = _get_provider()
     if provider == "groq":
         import json as _json
+
         from langchain_core.messages import SystemMessage
         from langchain_core.runnables import RunnableLambda
 

@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +9,7 @@ class ReviewOutput(BaseModel):
     approved: bool = Field(
         description="True only if there are zero blocking issues"
     )
-    comments: List[dict] = Field(
+    comments: list[dict] = Field(
         description=(
             "List of {file, line, severity, comment} dicts. "
             "severity must be one of: 'blocking', 'suggestion', 'nit'."

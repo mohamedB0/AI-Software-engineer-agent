@@ -1,5 +1,5 @@
 import operator
-from typing import Annotated, Dict, List, Optional, TypedDict
+from typing import Annotated, TypedDict
 
 
 class FileArtifact(TypedDict):
@@ -16,7 +16,7 @@ class TestResult(TypedDict):
     passed: bool
     total: int
     failed: int
-    failures: List[str]
+    failures: list[str]
     logs: str
 
 
@@ -24,7 +24,7 @@ class ReviewComment(TypedDict):
     """A single comment produced by the Code Reviewer agent."""
 
     file: str
-    line: Optional[int]
+    line: int | None
     # "blocking" | "suggestion" | "nit"
     severity: str
     comment: str
@@ -49,28 +49,28 @@ class ProjectState(TypedDict):
 
     # --- Product Manager output ---
     requirements: str
-    user_stories: List[str]
+    user_stories: list[str]
 
     # --- Software Architect output ---
     # Keys: "stack", "file_tree", "api_contracts", "db_schema", "rationale"
-    architecture: Dict
+    architecture: dict
 
     # --- Developer outputs ---
-    backend_files: Dict[str, FileArtifact]
-    frontend_files: Dict[str, FileArtifact]
+    backend_files: dict[str, FileArtifact]
+    frontend_files: dict[str, FileArtifact]
 
     # --- QA output ---
-    test_results: Optional[TestResult]
+    test_results: TestResult | None
 
     # --- Code Reviewer output ---
-    review_comments: List[ReviewComment]
+    review_comments: list[ReviewComment]
     review_approved: bool
 
     # --- Control flow ---
     revision_count: int
     max_revisions: int
-    # "planning" | "requirements_done" | "architecture_done" | "backend_done" |
-    # "frontend_done" | "qa_passed" | "qa_failed" | "approved" |
+    # "planning" | "requirements_done" | "architecture_done" | "dev_done" |
+    # "qa_passed" | "qa_failed" | "approved" |
     # "changes_requested" | "done" | "failed"
     status: Annotated[str, lambda old, new: new]
 

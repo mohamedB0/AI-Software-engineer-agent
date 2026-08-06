@@ -19,7 +19,19 @@ Prerequisites for sandbox tests:
 import pytest
 
 from app.graph.build_graph import route_after_qa, route_after_review
-from app.graph.state import ProjectState, TestResult
+from app.graph.state import ProjectState
+from app.graph.state import TestResult as StateTestResult
+
+
+def _docker_available() -> bool:
+    """True only when the Docker daemon is actually reachable (not just the CLI)."""
+    try:
+        import docker
+
+        docker.from_env().ping()
+        return True
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -48,12 +60,12 @@ def _make_state(**overrides) -> ProjectState:
     return base
 
 
-def _passing_test_result() -> TestResult:
-    return TestResult(passed=True, total=5, failed=0, failures=[], logs="5 passed")
+def _passing_test_result() -> StateTestResult:
+    return StateTestResult(passed=True, total=5, failed=0, failures=[], logs="5 passed")
 
 
-def _failing_test_result() -> TestResult:
-    return TestResult(
+def _failing_test_result() -> StateTestResult:
+    return StateTestResult(
         passed=False,
         total=5,
         failed=2,
@@ -128,13 +140,78 @@ class TestRouteAfterReview:
 
 
 # ---------------------------------------------------------------------------
+# Merge node tests
+# ---------------------------------------------------------------------------
+
+
+class TestMergeNode:
+    def test_merge_sets_dev_done_status(self):
+        from app.graph.build_graph import merge_dev_outputs
+
+        state = _make_state()
+        assert merge_dev_outputs(state) == {"status": "dev_done"}
+
+
+# ---------------------------------------------------------------------------
+# Sandbox helper tests (pure functions, no Docker required)
+# ---------------------------------------------------------------------------
+
+
+class TestSandboxHelpers:
+    def test_safe_relative_path_rejects_unsafe_paths(self):
+        from app.tools.sandbox_runner import _safe_relative_path
+
+        assert _safe_relative_path("../evil.py") is None
+        assert _safe_relative_path("a/../../evil.py") is None
+        assert _safe_relative_path("/etc/passwd") is None
+        assert _safe_relative_path("/workspace/main.py") is None
+        assert _safe_relative_path("./x.py") is None
+        assert _safe_relative_path("") is None
+        assert _safe_relative_path("a//b.py") is None
+
+    def test_safe_relative_path_normalizes_common_paths(self):
+        from app.tools.sandbox_runner import _safe_relative_path
+
+        assert _safe_relative_path("src/main.py") == "src/main.py"
+        assert _safe_relative_path("app\\main.py") == "app/main.py"
+
+    def test_build_tar_skips_unsafe_paths(self):
+        import tarfile
+
+        from app.tools.sandbox_runner import _build_tar
+
+        buf = _build_tar({"../evil.py": "x", "good.py": "y"})
+        buf.seek(0)
+        with tarfile.open(fileobj=buf, mode="r") as tar:
+            names = tar.getnames()
+        assert names == ["good.py"]
+
+    def test_parse_pytest_output_passed(self):
+        from app.tools.sandbox_runner import _parse_pytest_output
+
+        res = _parse_pytest_output(0, "3 passed, 1 failed in 1.00s")
+        assert res["passed"] is True
+        assert res["total"] == 4
+        assert res["failed"] == 1
+
+    def test_parse_pytest_output_failed(self):
+        from app.tools.sandbox_runner import _parse_pytest_output
+
+        logs = "FAILED test_bad.py::test_foo - AssertionError\n1 failed"
+        res = _parse_pytest_output(1, logs)
+        assert res["passed"] is False
+        assert res["total"] == 1
+        assert res["failures"] == ["test_bad.py::test_foo"]
+
+
+# ---------------------------------------------------------------------------
 # Sandbox runner tests (require Docker)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(
-    __import__("shutil").which("docker") is None,
-    reason="Docker is not available in this environment",
+    not _docker_available(),
+    reason="Docker daemon is not reachable in this environment",
 )
 class TestSandboxRunner:
     def test_passing_pytest_suite(self):

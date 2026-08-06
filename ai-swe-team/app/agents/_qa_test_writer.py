@@ -5,7 +5,7 @@ targeting the project's API contracts and user stories.
 
 import json as _json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -29,7 +29,7 @@ class TestFile(BaseModel):
 
 
 class TestSuite(BaseModel):
-    files: List[TestFile] = Field(
+    files: list[TestFile] = Field(
         description="List of pytest test files to execute against the implementation"
     )
     notes: str = Field(
@@ -58,7 +58,7 @@ Output structured JSON only.
 
 
 
-def generate_tests(state: ProjectState) -> Dict[str, str]:
+def generate_tests(state: ProjectState) -> dict[str, str]:
     """
     Ask the LLM to generate a pytest test suite for the current backend
     implementation. Returns a dict of {path: content} ready for the sandbox.

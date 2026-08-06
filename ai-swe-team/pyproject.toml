@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["venv", ".venv", "chroma_docs"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "I", "UP", "PIE", "ISC", "S"]
+ignore = ["BLE001"]  # broad except: deliberate for LLM/RAG/sandbox calls
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # asserts are the point of tests
+"scripts/*" = ["E402"]  # load_dotenv() must run before app imports
+"app/main.py" = ["E402"]  # load_dotenv() must run before app imports
+"app/config.py" = ["S105"]  # dev-only default credentials, overridable via env
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

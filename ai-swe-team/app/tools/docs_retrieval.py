@@ -33,7 +33,7 @@ def _get_embedding_function():
     Uses langchain-google-genai directly instead of ChromaDB's built-in Google
     wrapper, which has a compatibility issue with newer google-api-core versions.
     """
-    from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
+    from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
     # Prefer Google Gemini (free tier available)
     if settings.google_api_key:

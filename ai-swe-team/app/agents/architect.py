@@ -1,4 +1,3 @@
-from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -7,16 +6,16 @@ from app.graph.state import ProjectState
 
 
 class ArchitecturePlan(BaseModel):
-    stack: List[str] = Field(
+    stack: list[str] = Field(
         description="Concrete technology choices, e.g. 'FastAPI', 'PostgreSQL', 'React+Vite'"
     )
-    file_tree: List[str] = Field(
+    file_tree: list[str] = Field(
         description="Planned file/module paths, e.g. 'backend/app/main.py'"
     )
-    api_contracts: List[Dict] = Field(
+    api_contracts: list[dict] = Field(
         description="List of {method, path, request_schema, response_schema} dicts"
     )
-    db_schema: Dict = Field(
+    db_schema: dict = Field(
         description="Table/collection definitions keyed by name"
     )
     rationale: str = Field(

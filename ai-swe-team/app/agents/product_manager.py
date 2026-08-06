@@ -1,4 +1,3 @@
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +9,7 @@ class Requirements(BaseModel):
     requirements: str = Field(
         description="Clear, structured functional and non-functional requirements"
     )
-    user_stories: List[str] = Field(
+    user_stories: list[str] = Field(
         description="User stories in 'As a ... I want ... so that ...' form"
     )
 

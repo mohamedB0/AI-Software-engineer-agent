@@ -3,16 +3,16 @@ LangGraph StateGraph assembly.
 
 Graph topology:
 
-    pm --> architect --> backend_dev  --|
+    pm --> architect --> backend_dev --|
                     `--> frontend_dev --|
                                        v
-                                      qa --> (conditional) --> reviewer --> (conditional) --> END
-                                              |                              |
-                                              v                              v
-                                         bump_revision <--------------------'
-                                              |
-                                              +--> backend_dev
-                                              `--> frontend_dev
+                                      merge --> qa --> (conditional) --> reviewer --> (conditional) --> END
+                                                    |                              |
+                                                    v                              v
+                                               bump_revision <--------------------'
+                                                    |
+                                                    +--> backend_dev
+                                                    `--> frontend_dev
 
 Revision loop safety:
 - revision_count is incremented by the dedicated bump_revision node.
@@ -24,10 +24,11 @@ Revision loop safety:
 Fan-out / fan-in:
 - architect has two outgoing edges (backend_dev and frontend_dev), so LangGraph
   schedules both in the same superstep (parallel execution).
-- qa has two incoming edges; LangGraph only executes it once both branches
-  have completed for the current superstep (automatic fan-in).
-- backend_dev and frontend_dev write to disjoint state keys, so there is no
-  concurrent write conflict.
+- backend_dev and frontend_dev write to disjoint state keys (backend_files vs
+  frontend_files) and neither writes `status` (both would race on the same
+  channel). Instead, the merge node sets status deterministically once both
+  branches have completed (automatic fan-in).
+- qa has a single incoming edge (merge), so it always runs after the merge.
 """
 
 from langgraph.graph import END, StateGraph
@@ -38,10 +39,10 @@ from app.agents.code_reviewer import code_reviewer_node
 from app.agents.frontend_dev import frontend_dev_node
 from app.agents.product_manager import product_manager_node
 from app.agents.qa_engineer import qa_engineer_node
+
 # get_checkpointer is imported lazily inside build_graph() to avoid
 # establishing a Postgres connection at module import time.
 from app.graph.state import ProjectState
-
 
 # ---------------------------------------------------------------------------
 # Routing functions
@@ -86,6 +87,17 @@ def increment_revision(state: ProjectState) -> dict:
     return {"revision_count": state["revision_count"] + 1}
 
 
+def merge_dev_outputs(state: ProjectState) -> dict:
+    """
+    Fan-in node that runs once both developer branches have completed.
+
+    Exists so `status` is written deterministically: the two developer agents
+    run in parallel and never write to the same channel, which avoids a race
+    on the shared `status` key.
+    """
+    return {"status": "dev_done"}
+
+
 # ---------------------------------------------------------------------------
 # Graph construction
 # ---------------------------------------------------------------------------
@@ -107,6 +119,7 @@ def build_graph():
     graph.add_node("architect", architect_node)
     graph.add_node("backend_dev", backend_dev_node)
     graph.add_node("frontend_dev", frontend_dev_node)
+    graph.add_node("merge", merge_dev_outputs)
     graph.add_node("qa", qa_engineer_node)
     graph.add_node("reviewer", code_reviewer_node)
     graph.add_node("bump_revision", increment_revision)
@@ -121,9 +134,10 @@ def build_graph():
     graph.add_edge("architect", "backend_dev")
     graph.add_edge("architect", "frontend_dev")
 
-    # Fan-in: QA waits for both developer branches to complete.
-    graph.add_edge("backend_dev", "qa")
-    graph.add_edge("frontend_dev", "qa")
+    # Fan-in: merge waits for both developer branches, then hands off to QA.
+    graph.add_edge("backend_dev", "merge")
+    graph.add_edge("frontend_dev", "merge")
+    graph.add_edge("merge", "qa")
 
     # --- Conditional edges (routing logic) ---
     graph.add_conditional_edges(

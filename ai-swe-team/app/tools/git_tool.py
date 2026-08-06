@@ -6,8 +6,6 @@ or via the MCP Git server (mcp_config.py); the MCP server is preferred for
 graph-wide uniformity, but these utilities are useful for scripting and tests.
 """
 
-import os
-from pathlib import Path
 
 import git
 

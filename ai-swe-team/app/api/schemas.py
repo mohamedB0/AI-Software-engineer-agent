@@ -1,4 +1,3 @@
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,4 +14,4 @@ class ProjectResponse(BaseModel):
     # pending | running | awaiting_review | done | failed
     status: str
     revision_count: int
-    repo_url: Optional[str] = None
+    repo_url: str | None = None

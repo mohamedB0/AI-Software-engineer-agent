@@ -20,6 +20,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.schemas import CreateProjectRequest, ProjectResponse
+from app.config import settings
 from app.db.models import Project
 from app.db.session import SessionLocal, get_db
 from app.graph.build_graph import build_graph
@@ -28,8 +29,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-# Build the graph once at module load; it is thread-safe and reused across requests.
-graph = build_graph()
+# The compiled graph is thread-safe and reused across requests. It is built
+# lazily so importing this module never requires a live Postgres connection
+# (important for tests and for app startup before the DB is reachable).
+_graph = None
+
+
+def get_graph():
+    """Return the lazily-built, shared compiled graph instance."""
+    global _graph
+    if _graph is None:
+        _graph = build_graph()
+    return _graph
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +64,7 @@ async def run_graph_and_update_db(
     initial_state = {
         "spec": spec,
         "revision_count": 0,
-        "max_revisions": 3,
+        "max_revisions": settings.max_revisions,
         "status": "planning",
         "review_comments": [],
         "messages": [],
@@ -61,7 +72,7 @@ async def run_graph_and_update_db(
 
     final_state: dict = {}
     try:
-        final_state = await graph.ainvoke(initial_state, config=config)
+        final_state = await get_graph().ainvoke(initial_state, config=config)
         status = final_state.get("status", "done")
     except Exception:
         logger.exception(
@@ -73,7 +84,7 @@ async def run_graph_and_update_db(
 
     db = SessionLocal()
     try:
-        project = db.query(Project).get(project_db_id)
+        project = db.get(Project, project_db_id)
         if project:
             project.status = status
             project.revision_count = final_state.get("revision_count", 0)
@@ -129,7 +140,7 @@ async def create_project(
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str, db: Session = Depends(get_db)):
     """Get the current status and metadata for a project."""
-    project = db.query(Project).get(project_id)
+    project = db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return ProjectResponse(
@@ -153,9 +164,9 @@ async def get_project_full_state(project_id: str, db: Session = Depends(get_db))
 
     Useful for debugging, human review, and building a replay UI.
     """
-    project = db.query(Project).get(project_id)
+    project = db.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     config = {"configurable": {"thread_id": project.thread_id}}
-    snapshot = graph.get_state(config)
+    snapshot = get_graph().get_state(config)
     return snapshot.values
